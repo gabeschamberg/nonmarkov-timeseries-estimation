@@ -34,13 +34,15 @@ def fourier_x(admmobj):
 def gaussian_x(admmobj):
     if admmobj.K > 1:
         for n in range(admmobj.N):
-            admmobj.x[:, n] = 0.5 * admmobj.Cinv.dot((1 / admmobj.sig) * np.dot(admmobj.A.T, admmobj.obs[:, n]) +
-                                                     (admmobj.rho * admmobj.z[:, n] - admmobj.lam[:, n]))
+            admmobj.x[:, n] = 0.5 * admmobj.Cinv.dot((1 / admmobj.sig) * \
+                np.dot(admmobj.A.T, admmobj.obs[:, n]) + \
+                (admmobj.rho * admmobj.z[:, n] - admmobj.lam[:, n]))
     else:
         for n in range(admmobj.N):
-            admmobj.x[n] = ((admmobj.obs[n] - admmobj.b) * admmobj.A / admmobj.sig + admmobj.z[
-                n] * admmobj.rho / 2 - 0.5 * admmobj.lam[n]) / \
-                           (admmobj.A ** 2 / admmobj.sig + admmobj.rho / 2)
+            admmobj.x[n] = ((admmobj.obs[n] - admmobj.b) * admmobj.A / \
+                admmobj.sig + admmobj.z[n] * admmobj.rho / 2 - 0.5 * \
+                admmobj.lam[n]) / (admmobj.A ** 2 / admmobj.sig + \
+                admmobj.rho / 2)
 
 
 # x update used in state space model of learning
@@ -78,8 +80,8 @@ def ssml_grad_step(admmobj, n):
     S = len(admmobj.c)
     x = admmobj.x[n]
     c1 = admmobj.h ** 2 / (2 * admmobj.sigg) + admmobj.rho / 2
-    c2 = admmobj.lam[n] - M[n] * admmobj.eta - admmobj.h * (Q[n] - admmobj.delta) / admmobj.sigg - admmobj.rho * \
-                                                                                                   admmobj.z[n]
+    c2 = admmobj.lam[n] - M[n] * admmobj.eta - admmobj.h * \
+    (Q[n] - admmobj.delta) / admmobj.sigg - admmobj.rho * admmobj.z[n]
     c3 = 0
     for j in range(admmobj.J):
         temp = 0
@@ -101,7 +103,8 @@ def ssml_x(admmobj):
     R = admmobj.obs[2]
     S = len(admmobj.c)
     for j in range(admmobj.J):
-        c3 += np.exp(np.dot(R[:, max(0, j - S + 1):j + 1], np.asarray(admmobj.c[max(S - j - 1, 0):S]).T))
+        c3 += np.exp(np.dot(R[:, max(0, j - S + 1):j + 1],
+            np.asarray(admmobj.c[max(S - j - 1, 0):S]).T))
     for n in range(admmobj.N):
         admmobj.x[n] = ssml_solve_n(admmobj, n, c3[n])
 
