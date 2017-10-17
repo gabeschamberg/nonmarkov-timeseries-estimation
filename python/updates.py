@@ -44,10 +44,7 @@ def gaussian_x(admmobj):
                 admmobj.lam[n]) / (admmobj.A ** 2 / admmobj.sig + \
                 admmobj.rho / 2)
 
-
-# x update used in state space model of learning
-# updates based on observation triplet
-def ssml_solve_n(admmobj, n, const1):
+def ssml_solve_n_cvx(admmobj, n, const1):
     import cvxpy as cvx
     M = admmobj.obs[0]
     Q = admmobj.obs[1]
@@ -69,6 +66,43 @@ def ssml_solve_n(admmobj, n, const1):
     prob = cvx.Problem(obj, constraints)
     prob.solve(solver=cvx.SCS)
     return x.value[0, 0]
+
+def ssml_solve_n(admmobj, n, const1):
+    import cvxpy as cvx
+    M = admmobj.obs[0]
+    Q = admmobj.obs[1]
+    R = admmobj.obs[2]
+    R_n = R[n, :]
+    x = admmobj.x[n]
+    eps = 10**(-5)
+    diff = eps + 1
+    while(diff > eps):
+
+        df_M = admmobj.eta*np.exp(admmobj.mu+admmobj.eta*x)/ \
+            (1+np.exp(admmobj.mu+admmobj.eta*x)) - \
+            M[n]*admmobj.eta
+        df_Q = -admmobj.h*\
+            (Q[n] - admmobj.delta - admmobj.h*x)/ \
+            (admmobj.sigg)
+        df_R = admmobj.g*admmobj.Del*\
+            np.exp(admmobj.psi + admmobj.g*x)*const1 - \
+            admmobj.g*sum(R_n)
+        df_prox = admmobj.rho * (x - admmobj.z[n] + \
+            admmobj.lam[n]/admmobj.rho)
+        df = df_M + df_Q + df_R + df_prox
+
+        ddf_M = (admmobj.eta**2) *\
+            np.exp(admmobj.mu+admmobj.eta*x)/ \
+            ((1+np.exp(admmobj.mu+admmobj.eta*x))**2)
+        ddf_Q = (admmobj.h**2) / (admmobj.sigg)
+        ddf_R = (admmobj.g**2)*admmobj.Del*\
+            np.exp(admmobj.psi + admmobj.g*x)*const1
+        ddf_prox = admmobj.rho
+        ddf = ddf_M + ddf_Q + ddf_R + ddf_prox
+
+        x = x - df/ddf
+        diff = np.abs(df/ddf)
+    return x
 
 
 def ssml_grad_step(admmobj, n):
@@ -194,6 +228,22 @@ def least_sq_w(admmobj):
     admmobj.w = (1 / (admmobj.beta / admmobj.sigv + admmobj.rho)) * \
                 (admmobj.beta * admmobj.gamma / admmobj.sigv + \
                  admmobj.rho * np.dot(admmobj.G, admmobj.z) - admmobj.alph)
+
+def students_t_w(admmobj):
+    eps = 0.0000001
+    sig = 0.1
+    mu = admmobj.gamma
+    rho = admmobj.rho
+    w_tild = np.dot(admmobj.G, admmobj.z) - admmobj.alph/admmobj.rho
+    for n in range(len(admmobj.w)):
+        w = mu
+        f_ = eps + 1
+        while(np.abs(f_) > eps):
+            f_ = 4*(w-mu)/(3*sig + (w-mu)**2) + rho*(w - w_tild[n])
+            f__ = (12*sig - 4*((w-mu)**2))/ \
+                  ((3*sig + (w-mu)**2)**2) + rho
+            w = w - f_/f__
+        admmobj.w[n] = w
 
 
 # w update used to enforce sparsity on a vector w

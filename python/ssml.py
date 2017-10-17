@@ -6,25 +6,32 @@
 
 import numpy as np
 from framework import AdmmObject, AdmmSolver
-from updates import ssml_x, ssml_x_grad, ssml_x_parallel, ssml_x_grad_parallel, vector_z, least_sq_w, l1_w
+from updates import ssml_x, ssml_x_grad, ssml_x_parallel, ssml_x_grad_parallel
+from updates import vector_z, least_sq_w, l1_w, students_t_w
 from updates import vector_lam, vector_alph
 
 
 def ssml(observations, rho, params,
          thresh=0.0001, max_iters=10, verbosity=0,
          history=False, parallel=False, approx=False,
-         sparse=False):
+         sparse=False, students_t=False):
     # Number of trials
     N = len(observations[0])
     if sparse:
         admmobj = AdmmObject(N, observations, rho,
-                             ssml_x_parallel, vector_z,
+                             ssml_x, vector_z,
                              l1_w, vector_lam,
                              vector_alph)
         admmobj.beta = params[13]
+    elif students_t:
+        admmobj = AdmmObject(N, observations, rho,
+                             ssml_x, vector_z,
+                             students_t_w, vector_lam,
+                             vector_alph)
+        admmobj.beta = 1
     else:
         admmobj = AdmmObject(N, observations, rho,
-                             ssml_x_parallel, vector_z,
+                             ssml_x, vector_z,
                              least_sq_w, vector_lam,
                              vector_alph)
         admmobj.beta = 1
