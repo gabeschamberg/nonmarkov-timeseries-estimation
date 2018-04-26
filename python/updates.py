@@ -168,6 +168,62 @@ def ssml_x_grad_parallel(admmobj):
     results = Parallel(n_jobs=num_cores)(delayed(ssml_grad_step)(admmobj, n) for n in range(admmobj.N))
     admmobj.x = np.asarray(results)
 
+def spike_phase_x(admmobj):
+    for n in range(admmobj.N):
+        spike_phase_step(admmobj,n)
+
+def spike_phase_x_parallel(admmobj):
+    from joblib import Parallel, delayed
+    import multiprocessing
+    num_cores = multiprocessing.cpu_count()
+    results = Parallel(n_jobs=num_cores)(delayed(spike_phase_step)(admmobj, n) for n in range(admmobj.N))
+
+def spike_phase_step(admmobj,n):
+    spikes = admmobj.obs[:,n]
+    rmat = admmobj.regressors[n,:,:]
+    xn = admmobj.z[:,n] - admmobj.lam[:,n]/admmobj.rho
+    K = rmat.shape[0]
+    L = rmat.shape[1]
+    x = xn
+    step = 1
+    gradnorm = 1000
+    i = 1
+    while (gradnorm > 0.01) and (i < 10000):
+        x_prev = x
+        gradient = admmobj.rho * (x_prev-xn)
+        e = np.exp(rmat.T.dot(x_prev))
+        vec = e/(1+e) - spikes
+        mat = np.repeat(vec.reshape((L,1)),K,axis=1).T
+        gradient += np.sum(mat*rmat,axis=1)/L
+        x = x_prev - step*gradient
+        gradnorm = np.linalg.norm(gradient)
+        i += 1
+    admmobj.x[:,n] = x
+
+def spike_phase_x_cvx(admmobj):
+    import cvxpy as cvx
+    for n in range(admmobj.N):
+        spikes = admmobj.obs[:,n]
+        rmat = admmobj.regressors[n,:,:]
+        xn = admmobj.z[:,n] - admmobj.lam[:,n]/admmobj.rho
+        K = rmat.shape[0]
+        L = rmat.shape[1]
+        x = cvx.Variable(K)
+        tot = 0
+
+        #for l in range(L):
+        #    tot += cvx.logistic(rmat[:,l].T*(x))  - spikes[l]*(rmat[:,l].T*(x))
+        #obj = cvx.Minimize(tot + admmobj.rho/2 * cvx.norm(x-xn)**2)
+
+        obj = cvx.Minimize(
+                   cvx.logistic(rmat.T*(x))-spikes.dot(rmat.T*(x)) + \
+                   admmobj.rho/2 * cvx.norm(x-xn)**2
+        )
+
+        prob = cvx.Problem(obj)
+        prob.solve()#solver=cvx.SCS)
+        admmobj.x[:,n] = x.value[0, 0]
+
 
 #################### Z Updates #####################
 def matrix_z(admmobj):
@@ -183,7 +239,6 @@ def matrix_z(admmobj):
     vecz = bt_solver(veczx + veczw, admmobj.N, admmobj.K)
     for n in range(admmobj.N):
         admmobj.z[:, n] = vecz[n * admmobj.K:(n + 1) * admmobj.K].reshape((admmobj.K))
-
 
 def vector_z(admmobj):
     # a and b simplify the results of completing the square
@@ -204,6 +259,18 @@ def group_sparse_w(admmobj):
         Ak = A[k, :]
         Ak_norm = np.linalg.norm(Ak)
         w[k, :] = max(0, ((Ak_norm - (admmobj.beta / admmobj.rho)) / Ak_norm)) * Ak
+    admmobj.w = w
+
+# w update used for spectral sparsity and temporal smoothness
+def group_sparse_columns_w(admmobj):
+    # Create matrix that is z differences
+    Z = column_diffs(admmobj.z)
+    A = Z - (admmobj.alph / admmobj.rho)
+    w = np.zeros(admmobj.w.shape)
+    for n in range(admmobj.N):
+        An = A[:, n]
+        An_norm = np.linalg.norm(An)
+        w[:,n] = max(0, ((An_norm - (admmobj.beta / admmobj.rho)) / An_norm)) * An
     admmobj.w = w
 
 # w update used to enforce low-rank in w
@@ -258,6 +325,22 @@ def l1_w(admmobj):
             admmobj.w[n] = A[n] + v
         else:
             admmobj.w[n] = 0
+
+# w update used to enforce sparsity on a vector w
+def l1_matrix_w(admmobj):
+    # Create matrix that is z differences
+    Z = column_diffs(admmobj.z)
+    A = Z - (admmobj.alph / admmobj.rho)
+    w = np.zeros(admmobj.w.shape)
+    v = admmobj.beta / admmobj.rho
+    for n in range(admmobj.N):
+        for k in range(admmobj.K):
+            if A[k,n] > 0 and A[k,n] - v > 0:
+                admmobj.w[k,n] = A[k,n] - v
+            elif A[k,n] < 0 and A[k,n] + v < 0:
+                admmobj.w[k,n] = A[k,n] + v
+            else:
+                admmobj.w[k,n] = 0
 
 
 #################### Lambda Updates #####################

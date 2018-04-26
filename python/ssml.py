@@ -19,21 +19,18 @@ def ssml(observations, rho, params,
     N = len(observations[0])
     if sparse:
         admmobj = AdmmObject(N, observations, rho,
-                             ssml_x, vector_z,
-                             l1_w, vector_lam,
-                             vector_alph)
+                             ssml_x, l1_w, vector_z,
+                             vector_lam,vector_alph)
         admmobj.beta = params[13]
     elif students_t:
         admmobj = AdmmObject(N, observations, rho,
-                             ssml_x, vector_z,
-                             students_t_w, vector_lam,
-                             vector_alph)
+                             ssml_x, students_t_w, vector_z,
+                             vector_lam, vector_alph)
         admmobj.beta = 1
     else:
         admmobj = AdmmObject(N, observations, rho,
-                             ssml_x, vector_z,
-                             least_sq_w, vector_lam,
-                             vector_alph)
+                             ssml_x, least_sq_w, vector_z,
+                             vector_lam, vector_alph)
         admmobj.beta = 1
     # Augmented Lagrange parameter
     admmobj.rho = rho

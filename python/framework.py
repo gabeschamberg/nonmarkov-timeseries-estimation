@@ -83,13 +83,15 @@ class AdmmSolver:
         alphs = [self.obj.lam]
         # Continue updating variables until converged
         while not converged and iters < self.max_iters:
+            if self.v > 2:
+                print('----------Iteration %i----------'%iters)
             # x update
             start = time.time()
             x_ = np.copy(self.obj.x)
             self.obj.update_x(self.obj)
             xtime = time.time() - start
             xs.append(self.obj.x)
-            if (self.v > 3):
+            if (self.v > 4):
                 print("x updated in " + str(xtime) + " seconds")
                 sys.stdout.flush()
             # w update
@@ -98,7 +100,7 @@ class AdmmSolver:
             self.obj.update_w(self.obj)
             wtime = time.time() - start
             ws.append(self.obj.w)
-            if (self.v > 3):
+            if (self.v > 4):
                 print("w updated in " + str(wtime) + " seconds")
                 sys.stdout.flush()
             # z update
@@ -107,7 +109,7 @@ class AdmmSolver:
             self.obj.update_z(self.obj)
             ztime = time.time() - start
             zs.append(self.obj.z)
-            if (self.v > 3):
+            if (self.v > 4):
                 print("z updated in " + str(ztime) + " seconds")
                 sys.stdout.flush()
             # lambda update
@@ -116,7 +118,7 @@ class AdmmSolver:
             self.obj.update_lam(self.obj)
             ltime = time.time() - start
             lams.append(self.obj.lam)
-            if (self.v > 3):
+            if (self.v > 4):
                 print("lambda updated in " + str(ltime) + " seconds")
                 sys.stdout.flush()
             # alpha update
@@ -125,11 +127,12 @@ class AdmmSolver:
             self.obj.update_alph(self.obj)
             atime = time.time() - start
             alphs.append(self.obj.alph)
-            if (self.v > 3):
+            if (self.v > 4):
                 print("alpha updated in " + str(atime) + " seconds")
                 sys.stdout.flush()
             # Update residuals and check for convergence
             converged = self.update_residuals(x_, z_, w_, lam_, alph_)
+
             # Update iteration count
             iters = iters + 1
             # Update average runtimes
@@ -167,6 +170,9 @@ class AdmmSolver:
         self.eps_r1.append(eps_r1)
         eps_r2 = eps_abs + self.eps * np.linalg.norm(alph_.dot(self.A.T))
         self.eps_r2.append(eps_r2)
+        if self.v > 3:
+            print('Residuals: S1=%f | S2=%f | R1=%f | R2=%f'\
+                %(s1norm,s2norm,r1norm,r2norm))
         if (s1norm < eps_s1 and s2norm < eps_s2 and
                     r1norm < eps_r1 and r2norm < eps_r2):
             return True
